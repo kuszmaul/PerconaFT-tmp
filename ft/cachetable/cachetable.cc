@@ -4433,6 +4433,7 @@ struct iterate_note_pin {
 // Sets up and kicks off a checkpoint.
 //
 void checkpointer::begin_checkpoint() {
+    printf("BEGIN CHECKPOINT\n");
     // 1. Initialize the accountability counters.
     m_checkpoint_num_txns = 0;
     
@@ -4462,6 +4463,7 @@ void checkpointer::begin_checkpoint() {
     m_cf_list->read_unlock();
     m_list->read_list_unlock();
     m_list->write_pending_exp_unlock();
+
 }
 
 struct iterate_log_fassociate {
@@ -4568,6 +4570,7 @@ void checkpointer::end_checkpoint(void (*testcallback_f)(void*),  void* testextr
 
     // Delete list of cachefiles in the checkpoint,
     this->remove_cachefiles(checkpoint_cfs);
+    printf("END CHECKPOINT\n");
 }
 
 struct iterate_checkpoint_cfs {
