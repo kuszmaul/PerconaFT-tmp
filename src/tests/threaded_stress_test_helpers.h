@@ -54,6 +54,8 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #include "toku_config.h"
 #include "test.h"
 
+#include <atomic>
+
 #include <stdio.h>
 #include <math.h>
 #include <locale.h>
@@ -227,6 +229,18 @@ struct perf_formatter {
     void (*totals)(const struct cli_args *cli_args, uint64_t *counters[], const int num_threads);
 };
 
+std::atomic_bool am_in_checkpoint;
+static void did_start_checkpoint(void* ignore) {
+    assert(ignore == NULL);
+    am_in_checkpoint = true;
+    printf("Started checkpoint\n");
+}
+static void did_end_checkpoint(void* ignore) {
+    assert(ignore == NULL);
+    am_in_checkpoint = false;
+    printf("Ended checkpoint\n");
+}
+
 static inline int
 seconds_in_this_iteration(const int current_time, const int performance_period)
 {
@@ -368,6 +382,7 @@ static void
 tsv_print_perf_header(const struct cli_args *cli_args, const int num_threads)
 {
     printf("\"seconds\"");
+    printf("\t\"checkpoint\"");
     if (cli_args->print_thread_performance) {
         for (int t = 1; t <= num_threads; ++t) {
             for (int op = 0; op < (int) NUM_OPERATION_TYPES; ++op) {
@@ -386,6 +401,7 @@ tsv_print_perf_iteration(const struct cli_args *cli_args, const int current_time
 {
     const int secondsthisiter = seconds_in_this_iteration(current_time, cli_args->performance_period);
     printf("%d", current_time);
+    printf("\t%d", am_in_checkpoint.load());
     uint64_t period_totals[(int) NUM_OPERATION_TYPES];
     ZERO_ARRAY(period_totals);
     for (int t = 0; t < num_threads; ++t) {
@@ -1947,6 +1963,9 @@ static int create_tables(DB_ENV **env_res, DB **db_res, int num_DBs,
     }
     int env_flags = get_env_open_flags(cli_args);
     r = env->open(env, env_args.envdir, env_flags, S_IRWXU+S_IRWXG+S_IRWXO); CKERR(r);
+    printf("Setting callbacks\n");
+    db_env_set_checkpoint_callback(did_start_checkpoint, NULL);
+    db_env_set_checkpoint_callback2(did_end_checkpoint, NULL);    
     r = env->checkpointing_set_period(env, env_args.checkpointing_period); CKERR(r);
     r = env->cleaner_set_period(env, env_args.cleaner_period); CKERR(r);
     r = env->cleaner_set_iterations(env, env_args.cleaner_iterations); CKERR(r);
